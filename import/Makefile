@@ -10,9 +10,7 @@ SHELL := bash
 
 .PHONY: all
 
-#clean: 
-#		-rm -r output/*
-
+# This could probably be written better to specify outputs
 all: \
 		input/us_border_patrol_monthly_encounters_fy2000-fy2020-508.pdf
 	page=1 ; while [[ $$page -le 21 ]] ; do \
@@ -23,7 +21,8 @@ all: \
 	done
 	Rscript --vanilla src/convert.R
 
-
+clean: 
+		-rm -r output/*
 
 
 # done.

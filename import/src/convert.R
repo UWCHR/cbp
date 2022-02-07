@@ -29,7 +29,20 @@ for (fy in fys){
     rownames(df) <- NULL
   }
   
-  colnames(df) <- c("sector", "october", "november", "december", "january", "february", "march", "april", "may", "june", "july", "august", "september", "yearly total")
+  colnames(df) <- c("sector",
+                    "october",
+                    "november",
+                    "december",
+                    "january",
+                    "february",
+                    "march",
+                    "april",
+                    "may",
+                    "june",
+                    "july",
+                    "august",
+                    "september",
+                    "yearly total")
   
   if (fy <= 2018) {
     big_bend <- 14
@@ -44,24 +57,32 @@ for (fy in fys){
     df[rio_grande,1] <- rio_grande_name
     df[rio_grande,2:14] <- rio_grande_values
     df <- df[-c(13, 15, 20, 22, 30, 31),]
+    
+    df <- df %>% 
+      mutate_all(~str_replace(., 'N/A', '0')) %>% 
+      mutate_all(~str_replace(., 'Livermore\\*', 'Livermore'))
+    
+    df[,2:14] <- as.numeric(gsub(",", "", unlist(df[,2:14])))
+    
+    # Spot testing that row and subgroup totals are correct
+    stopifnot(sum(df[1, 2:13]) == df[1, 14],
+              sum(df[2, 2:13]) == df[2, 14],
+              sum(df[1:21, 2]) == df[25, 2],
+              sum(df[22:24, 2]) == df[25, 2])
+    
   } else if (fy >= 2019) {
     df <- df[-c(25),]
+    
+    df[,2:14] <- as.numeric(gsub(",", "", unlist(df[,2:14])))
+    
+    # Spot testing that row and subgroup totals are correct
+    stopifnot(sum(df[1, 2:13]) == df[1, 14],
+              sum(df[2, 2:13]) == df[2, 14],
+              sum(df[1:20, 2]) == df[24, 2],
+              sum(df[21:23, 2]) == df[24, 2])
   }
 
   rownames(df) <- NULL
-  
-  df <- df %>% 
-    mutate_all(~str_replace(., 'N/A', '0')) %>% 
-    mutate_all(~str_replace(., 'Livermore\\*', 'Livermore'))
-  
-  df[,2:14] <- as.numeric(gsub(",", "", unlist(df[,2:14])))
-  
-#  stopifnot(
-#    sum(df[1, 2:13]) == df[1, 14],
-#    sum(df[2, 2:13]) == df[2, 14],
-#    sum(df[1:21, 2]) == df[25, 2],
-#    sum(df[22:24, 2]) == df[25, 2]
-#  )
   
   df <- df %>%
     pivot_longer(cols = c(-'sector'), names_to="month") %>% 
@@ -74,12 +95,15 @@ for (fy in fys){
   prev_cy <- c('october', 'november', 'december')
   
   df <- df %>% 
-    mutate(fy = fy)
+    mutate(fy = fy) %>% 
+    mutate(cy = case_when(month %in% prev_cy ~ .$fy - 1,
+                          TRUE ~ as.numeric(.$fy)))
   
   all_fys <- rbind(all_fys, df)
 
 }
+  
 
-write_delim(all_fys, here::here('import', 'output', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
+write_delim(all_fys, here::here('import','output', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
 
 # DONE
