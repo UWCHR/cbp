@@ -1,0 +1,33 @@
+---
+title: "R Notebook"
+---
+
+```{r libraries}
+
+library(tidyr)
+library(stringr)
+library(dplyr)
+library(tesseract)
+library(assertr)
+library(here)
+library(pdftools)
+library(argparse)
+
+```
+
+```{r from_pdftools}
+
+# Basic start for importing using pdftools
+
+parser <- ArgumentParser()
+parser$add_argument("--input",
+                    default =  '../input/us_border_patrol_monthly_encounters_fy2000-fy2020-508.pdf')
+parser$add_argument("--outputdir", default = "output")
+args <- parser$parse_args()
+
+converted <- tibble(
+    txt = pdf_text(args$input) %>% str_trim,
+    df  = pdf_data(args$input)
+) %>% transmute(page_no = seq_len(nrow(.)), txt, df)
+
+```
