@@ -1,6 +1,13 @@
+# ---
+# title: "Covert USBP monthly encounters data"
+# date: "2022-02-07"
+# author: "PN"
+# copyright: UWCHR, GPL 3.0
+# ---
+
 library(pacman)
 
-pacman::p_load(argparse, tidyr, stringr, dplyr, assertr, here, readr)
+pacman::p_load(argparse, tidyr, stringr, dplyr, assertr, here, readr, janitor)
 
 fys <- c(2000:2020)
 
@@ -102,7 +109,23 @@ for (fy in fys){
   all_fys <- rbind(all_fys, df)
 
 }
-  
+
+all_fys <- all_fys %>%
+  clean_names() %>%
+  filter(month != 'yearly total') %>%
+  mutate(month = recode(month,
+                        january = 1,
+                        february = 2,
+                        march = 3,
+                        april = 4,
+                        may = 5,
+                        june = 6,
+                        july = 7,
+                        august = 8,
+                        september = 9,
+                        october = 10,
+                        november = 11,
+                        december = 12))
 
 write_delim(all_fys, here::here('import','output', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
 
