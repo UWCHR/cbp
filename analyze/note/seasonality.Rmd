@@ -1,0 +1,50 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+pacman::p_load(tidyverse, ggplot2, tseries)
+
+df <- read_delim(here::here('export', 'output', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
+
+monthly_total <- ts(df$monthly_total, frequency=12, start=c(2000, 10))
+
+plot.ts(monthly_total)
+
+```
+
+```{r decompose}
+
+decomp <- decompose(monthly_total)
+
+plot(decomp)
+```
+
+```{r season_adjust}
+
+total_adjust <- monthly_total - decomp$seasonal
+
+plot(total_adjust)
+
+```
+
+```{r detrend}
+
+total_adjust.lag1 <- stats::lag(total_adjust, -1)
+
+total_adjust_detrend <- total_adjust - total_adjust.lag1
+
+plot(total_adjust_detrend)
+
+```
+
+```{r diagnostic}
+
+acf(total_adjust_detrend)
+pacf(total_adjust_detrend)
+
+adf.test(total_adjust_detrend)
+
+```
