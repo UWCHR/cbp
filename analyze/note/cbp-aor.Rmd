@@ -1,0 +1,145 @@
+---
+title: "FY20-23 CBP nationwide encounters"
+author: "UWCHR"
+date: "2024-01-31"
+output:
+    html_document:
+        html_preview: true
+        toc: true
+        toc_depth: 3
+        toc_float: true
+        code_folding: hide
+---
+
+# CBP nationwide encounters: Data overview
+
+https://www.cbp.gov/newsroom/stats/nationwide-encounters
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+library(pacman)
+
+p_load(here, tidyverse, zoo, lubridate, ggplot2, plotly, gghighlight)
+
+cbp <- read_delim(here('analyze', 'input', 'cbp-nationwide-encounters-fy20-fy23-aor.csv'), delim=',')
+
+names(cbp) %<>%
+  str_replace_all(" \\s*\\([^\\)]+\\)", "") %>% 
+  str_replace_all("\\s","_") %>%
+  tolower()
+
+month_abb_fy <- c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul","Aug", "Sep")
+
+cbp <- cbp %>% 
+  mutate(month_abb = ordered(str_to_title(month), month_abb_fy),
+         month = match(month_abb, month.abb),
+         fiscal_year = factor(fiscal_year))
+
+skimr::skim(cbp)
+
+```
+
+```{r national_total}
+
+p1 <- cbp %>% 
+  group_by(fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line()
+
+p1
+
+```
+
+```{r blw_spw_total}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW')) %>% 
+  group_by(fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line()
+
+p1
+
+p2 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW')) %>% 
+  group_by(aor, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~aor)
+
+p2
+
+p3 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW')) %>% 
+  group_by(aor, title_of_authority, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(title_of_authority~aor)
+
+p3
+
+```
+
+```{r seattle_portland_total}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line()
+
+p1
+
+p2 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(aor, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~aor)
+
+p2
+
+p3 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>%
+  group_by(aor, title_of_authority, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(title_of_authority~aor)
+
+p3
+```
+
+```{r component}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland', "SPW", "BLW")) %>% 
+  group_by(component, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~component)
+
+p1
+
+# `aor` is a sub-set of `component`
+
+cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland', "SPW", "BLW")) %>% 
+  group_by(aor, component) %>% 
+  summarize(n = sum(encounter_count))
+
+# OFO encounters exclude apprehensions; USBP encounters exclude inadmissibles
+
+cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland', "SPW", "BLW")) %>% 
+  group_by(component, encounter_type) %>% 
+  summarize(n = sum(encounter_count))
+
+```
