@@ -180,6 +180,8 @@ ggplotly(p1)
 
 # Pacific Northwest USBP sectors/OFO field offices
 
+USBP sectors with jurisdiction in the Pacific Northwest are Blaine Sector ("BLW") and Spokane Sector ("SPW"):
+
 ```{r blw_spw_total}
 
 p1 <- cbp %>% 
@@ -212,6 +214,8 @@ p3 <- cbp %>%
 p3
 
 ```
+
+OFO field offices in Pacific Northwest include Seattle Field Office and Portland Field Office.
 
 ```{r seattle_portland_total}
 
@@ -254,6 +258,20 @@ p1 <- cbp %>%
   ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
   geom_line() +
   facet_wrap(~component)
+
+p1
+
+```
+
+```{r component}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland', "SPW", "BLW")) %>% 
+  group_by(encounter_type, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~encounter_type)
 
 p1
 
