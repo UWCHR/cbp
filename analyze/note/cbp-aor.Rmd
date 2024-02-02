@@ -1,0 +1,318 @@
+---
+title: "FY20-23 CBP nationwide encounters"
+author: "UWCHR"
+date: "2024-01-31"
+output:
+    html_document:
+        html_preview: true
+        toc: true
+        toc_depth: 3
+        toc_float: true
+        code_folding: hide
+---
+
+# CBP nationwide encounters: Data overview
+
+https://www.cbp.gov/newsroom/stats/nationwide-encounters
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+library(pacman)
+
+p_load(here, tidyverse, zoo, lubridate, ggplot2, plotly, gghighlight)
+
+cbp <- read_delim(here('analyze', 'input', 'cbp-nationwide-encounters-fy20-fy23-aor.csv'), delim=',')
+
+names(cbp) %<>%
+  str_replace_all(" \\s*\\([^\\)]+\\)", "") %>% 
+  str_replace_all("\\s","_") %>%
+  tolower()
+
+month_abb_fy <- c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul","Aug", "Sep")
+
+cbp <- cbp %>% 
+  mutate(month_abb = ordered(str_to_title(month), month_abb_fy),
+         month = match(month_abb, month.abb),
+         calendar_year = case_when(month >= 10 ~ as.numeric(fiscal_year) -1,
+                                   TRUE ~ as.numeric(fiscal_year)),
+         fiscal_year = factor(fiscal_year))
+
+cbp$year_mon <- as.yearmon(paste(cbp$calendar_year, cbp$month, sep='-'))
+cbp$fy_quarter <- quarter(cbp$year_mon, fiscal_start=10, type="year.quarter")
+
+skimr::skim(cbp)
+
+```
+
+# National data:
+
+Note throughout "Encounters" may include multiple repeat encounters of the same individual/s.
+
+CBP's portal presents data as year-over-year trend, we can replicate this presentation as below:
+
+```{r national_total_fy, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  group_by(fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  ylim(0,NA) +
+  labs(title = "CBP total national encounters, FY20-23")
+
+p1
+
+```
+
+We can also visualize long-term trend:
+
+```{r national_total, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+p2 <- cbp %>% 
+  group_by(year_mon) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n)) + 
+  geom_line() +
+  ylim(0,NA) +
+  labs(title = "CBP total national encounters, FY20-23")
+
+p2
+
+```
+
+CBP national encounters data are broken out by by `component`: U.S. Border Patrol (USBP, responsible for enforcement in interior and between ports of entry) or Office of Field Operations (OFO, a.k.a. customs, responsible for enforcement at ports of entry).
+
+Components are broken out geographically by `aor` (area of responsibility), with USBP and OFO using mutually exclusive AOR categories with overlapping territories; e.g. USPB Spokane/Blaine sectors ("SPW", "BLW"), OFO Seattle/Portland Field Offices. (Data is also categorized by `land_border_region`).
+
+```{r data_structure_aor, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+# `aor` is a sub-set of `component`
+
+cbp %>% 
+  group_by(aor, component) %>% 
+  summarize(n = sum(encounter_count))
+
+```
+
+Nationally, USBP reports greater proportion of encounters than OFO:
+
+```{r national_breakdown_component, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  group_by(component, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~component)
+
+p1
+
+```
+
+Encounters are further broken out by `encounter_type` and `title_of_authority`: both OFO and USBP components report Title 42 "Expulsions"; while "USBP" reports "Apprehensions" and OFO reports "Inadmissibles" under Title 8 authority.
+
+```{r data_structure_encounter_type, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+# OFO encounters exclude apprehensions; USBP encounters exclude inadmissibles
+
+cbp %>% 
+  group_by(component, encounter_type) %>% 
+  summarize(n = sum(encounter_count))
+
+cbp %>% 
+  group_by(component, title_of_authority) %>% 
+  summarize(n = sum(encounter_count))
+
+cbp %>% 
+  group_by(encounter_type, title_of_authority) %>% 
+  summarize(n = sum(encounter_count))
+
+```
+
+From Mar. 2020 through May 2023, both USBP and OFO carried out Title 42 expulsions in addition to Title 8 apprehensions/determinations of inadmissibility:
+
+```{r national_breakdown_title, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+
+# Note effect of Title 42 expulsions on rates of Title 8 apprehensions/inadmissibles
+
+p2 <- cbp %>% 
+  group_by(title_of_authority, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~title_of_authority)
+
+p2
+
+p2.1 <- cbp %>% 
+  group_by(title_of_authority, year_mon) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = title_of_authority, fill=title_of_authority)) + 
+  geom_area() +
+  ylim(0, NA) +
+  labs(title = "Total CBP encounters by Title of Authority")
+
+p2.1
+
+```
+
+We can also observe national trends with regards to CBP "Demographic" categories:
+
+```{r national_breakdown_demog, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+p3 <- cbp %>% 
+  group_by(demographic, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~demographic)
+
+p3
+
+```
+
+...and citizenship:
+
+```{r cit, echo=FALSE, message=FALSE, include=TRUE}
+
+cit <- cbp %>%
+  group_by(citizenship) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  arrange(desc(n))
+
+p1 <- cbp %>% 
+  mutate(citizenship = case_when(
+    citizenship %in% head(cit$citizenship, 15) ~ citizenship,
+    TRUE ~ "ALL OTHERS"
+  )) %>% 
+  group_by(fiscal_year, citizenship) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x=fiscal_year, y=n, fill=citizenship)) +
+  geom_col() +
+  labs(title = "Total CBP encounters by country of citizenship (top 15)")
+
+ggplotly(p1)
+
+p2 <- cbp %>% 
+  mutate(citizenship = case_when(
+    citizenship %in% head(cit$citizenship, 15) ~ citizenship,
+    TRUE ~ "ALL OTHERS"
+  )) %>% 
+  group_by(fiscal_year, title_of_authority, citizenship) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x=fiscal_year, y=n, fill=citizenship)) +
+  geom_col() +
+  labs(title = "Total CBP encounters by country of citizenship (top 15)") +
+  facet_wrap(~title_of_authority)
+
+ggplotly(p2)
+
+```
+
+```{r cit_rank, echo=FALSE, message=FALSE, include=TRUE}
+
+cit_rank <- cbp %>% 
+  group_by(fiscal_year, citizenship) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  arrange(fiscal_year, desc(n), citizenship) %>% 
+  group_by(fiscal_year) %>% 
+  mutate(ranking = row_number())
+
+p1 <- cit_rank %>% 
+  filter(ranking <= 10) %>% 
+  ggplot(aes(x = fiscal_year, y = ranking, group = citizenship)) +
+  geom_line(aes(color = citizenship, alpha = 1), size = 1) +
+  geom_point(aes(color = citizenship, alpha = 1), size = 2) +
+  scale_y_reverse() +
+  labs(title = "Ranked country of citizenship for CBP encounters")
+
+ggplotly(p1)
+
+```
+
+# Pacific Northwest USBP sectors/OFO field offices
+
+Here, we focus on CBP components with jurisdiction in the Pacific Northwest: USBP Spokane and Blaine Sectors ("SPW", "BLW", respectively); and OFO Seattle and Portland Field Offices. Note OFO components report much greater proportion of encounters in PNW compared to USBP sectors.
+
+```{r pnw_total, echo=FALSE, message=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW', "Seattle", "Portland")) %>% 
+  group_by(year_mon, aor) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = aor)) + 
+  geom_line()
+
+p1
+
+```
+
+```{r blw_spw_total, echo=FALSE, message=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW')) %>% 
+  group_by(aor, year_mon) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = aor)) + 
+  geom_line()
+
+p1
+
+p2 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW')) %>% 
+  group_by(aor, title_of_authority, year_mon) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = aor)) + 
+  geom_line() +
+  facet_wrap(~title_of_authority)
+
+p2
+
+```
+
+```{r seattle_portland_total, echo=FALSE, message=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line()
+
+p1
+
+p2 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(aor, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~aor)
+
+p2
+
+p3 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>%
+  group_by(aor, title_of_authority, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(title_of_authority~aor)
+
+p3
+```
+
+```{r component, echo=FALSE, message=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland', "SPW", "BLW")) %>% 
+  group_by(component, fiscal_year, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  geom_line() +
+  facet_wrap(~component)
+
+p1
+
+```
