@@ -239,12 +239,17 @@ Here, we focus on CBP components with jurisdiction in the Pacific Northwest: USB
 
 p1 <- cbp %>% 
   filter(aor %in% c('BLW', 'SPW', "Seattle", "Portland")) %>% 
-  group_by(year_mon, aor) %>% 
+  group_by(component, year_mon, aor) %>% 
   summarize(n = sum(encounter_count)) %>% 
   ggplot(aes(x = year_mon, y = n, color = aor)) + 
-  geom_line()
+  geom_line() +
+  facet_wrap(~component) +
+  labs(title="CBP encounters by component (OFO, USBP) and Field Office/Sector",
+       caption="Source: CBP nationwide encounters FY2020-2023",
+       color="Field Office/Sector")
 
 p1
+
 
 ```
 
@@ -252,26 +257,59 @@ p1
 
 p1 <- cbp %>% 
   filter(aor %in% c('BLW', 'SPW')) %>% 
-  group_by(aor, year_mon) %>% 
+  group_by(aor, encounter_type, year_mon) %>% 
   summarize(n = sum(encounter_count)) %>% 
   ggplot(aes(x = year_mon, y = n, color = aor)) + 
-  geom_line()
-
+  geom_line() +
+  facet_wrap(~encounter_type)
+ 
 p1
 
 p2 <- cbp %>% 
   filter(aor %in% c('BLW', 'SPW')) %>% 
-  group_by(aor, title_of_authority, year_mon) %>% 
+  group_by(aor,encounter_type, title_of_authority, year_mon) %>% 
   summarize(n = sum(encounter_count)) %>% 
   ggplot(aes(x = year_mon, y = n, color = aor)) + 
   geom_line() +
-  facet_wrap(~title_of_authority)
+  facet_wrap(encounter_type~title_of_authority) +
+  labs(title="USBP Blaine/Spokane Sector encounters",
+       subtitle="Encounter type and Title of authority",
+       caption="Source: CBP nationwide encounters FY2020-2023",
+       color="Sector")
 
 p2
 
 ```
 
 ```{r seattle_portland_total, echo=FALSE, message=FALSE, include=TRUE}
+
+p1 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(aor, encounter_type, year_mon) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = aor)) + 
+  geom_line() +
+  facet_wrap(~encounter_type)
+ 
+p1
+
+p2 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(aor,encounter_type, title_of_authority, year_mon) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = aor)) + 
+  geom_line() +
+  facet_wrap(encounter_type~title_of_authority) +
+  labs(title="OFO Seattle/Portland Field Office encounters",
+       subtitle="Encounter type and Title of authority",
+       caption="Source: CBP nationwide encounters FY2020-2023",
+       color="Field Office")
+
+p2
+
+```
+
+```{r seattle_portland_other, echo=FALSE, message=FALSE, include=TRUE}
 
 p1 <- cbp %>% 
   filter(aor %in% c('Seattle', 'Portland')) %>% 
@@ -303,16 +341,51 @@ p3 <- cbp %>%
 p3
 ```
 
-```{r component, echo=FALSE, message=FALSE, include=TRUE}
+# Compare USBP reports
 
-p1 <- cbp %>% 
-  filter(aor %in% c('Seattle', 'Portland', "SPW", "BLW")) %>% 
-  group_by(component, fiscal_year, month_abb) %>% 
+https://www.cbp.gov/document/stats/us-border-patrol-monthly-encounters-fy-2000-fy-2020
+
+```{r usbp_monthly}
+
+usbp <- read_delim(here('analyze', 'input', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
+
+usbp <- usbp %>% 
+  dplyr::select(cy, fy, month, spokane, blaine) %>% 
+  rename(usbp_spokane = spokane,
+         usbp_blaine = blaine) %>% 
+  mutate(fy = as.numeric(as.character(fy)))
+
+cbp_spw_blw <- cbp %>% 
+  rename(cy = calendar_year,
+         fy = fiscal_year) %>% 
+  filter(aor %in% c("SPW", "BLW")) %>% 
+  group_by(fy, cy, month, aor) %>% 
   summarize(n = sum(encounter_count)) %>% 
-  ggplot(aes(x = month_abb, y = n, color = fiscal_year, group=fiscal_year)) + 
+  pivot_wider(names_from = aor, values_from = n) %>% 
+  rename(cbp_spw = SPW,
+         cbp_blw = BLW) %>% 
+  mutate(fy = as.numeric(as.character(fy)))
+
+dat <- full_join(usbp, cbp_spw_blw, by=c("cy", "fy", "month")) %>%
+  mutate(diff_spw = usbp_spokane - cbp_spw,
+         diff_blw = usbp_blaine - cbp_blw)
+
+stopifnot(sum(dat$diff_spw, na.rm=TRUE) == 0)
+stopifnot(sum(dat$diff_blw, na.rm=TRUE) == 0)
+
+dat_long <- dat %>% 
+  dplyr::select(-starts_with('diff')) %>% 
+  pivot_longer(cols=-c("cy", "fy", "month")) %>% 
+  mutate(year_mon = as.yearmon(paste(cy, month, sep='-')))
+
+p1 <- dat_long %>% 
+  ggplot(aes(x = year_mon, y = value, color = name)) +
   geom_line() +
-  facet_wrap(~component)
+  labs(title="USBP Blaine/Spokane Sector encounters FY2000-2023",
+       caption="Source: USBP monthly encounters FY2000-2020\nCBP nationwide encounters FY2020-2023",
+       color="Source/Sector")
 
 p1
 
 ```
+
