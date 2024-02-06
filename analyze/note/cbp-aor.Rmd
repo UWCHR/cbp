@@ -390,6 +390,11 @@ dat <- full_join(usbp, cbp_spw_blw, by=c("cy", "fy", "month")) %>%
   mutate(diff_spw = usbp_spokane - cbp_spw,
          diff_blw = usbp_blaine - cbp_blw)
 
+dat$blw <- coalesce(dat$usbp_blaine, dat$cbp_blw)
+dat$spw <- coalesce(dat$usbp_spokane, dat$cbp_spw)
+
+write_delim(dat, here('analyze', 'output', 'usbp_blw_spw_fy2000-fy2023.csv.gz'), delim='|')
+
 stopifnot(sum(dat$diff_spw, na.rm=TRUE) == 0)
 stopifnot(sum(dat$diff_blw, na.rm=TRUE) == 0)
 
