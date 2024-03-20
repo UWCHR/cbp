@@ -379,7 +379,9 @@ stopifnot(sum(dat$diff_spw, na.rm=TRUE) == 0)
 stopifnot(sum(dat$diff_blw, na.rm=TRUE) == 0)
 
 dat_long <- dat %>% 
-  dplyr::select(-starts_with('diff')) %>% 
+  dplyr::select(-starts_with(c('diff', 'cbp'))) %>% 
+  rename('cbp_blw' = 'blw',
+         'cbp_spw' = 'spw') %>% 
   pivot_longer(cols=-c("cy", "fy", "month")) %>% 
   mutate(year_mon = as.yearmon(paste(cy, month, sep='-')))
 
