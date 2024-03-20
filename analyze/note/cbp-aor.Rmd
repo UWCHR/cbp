@@ -157,6 +157,19 @@ p2.1
 
 ```
 
+
+```{r national_breakdown_region, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
+
+p3 <- cbp %>% 
+  group_by(land_border_region, year_mon, month_abb) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = year_mon, y = n, color = land_border_region, group=land_border_region)) + 
+  geom_line()
+
+p3
+
+```
+
 We can also observe national trends with regards to CBP "Demographic" categories:
 
 ```{r national_breakdown_demog, echo=FALSE, message=FALSE, warning=FALSE, include=TRUE}
@@ -253,6 +266,9 @@ p1
 
 ```
 
+Northern border encounters up in general:
+https://www.nbcnews.com/news/latino/more-asylum-requests-illegal-crossings-canada-northern-border-rcna126329
+
 ```{r blw_spw_total, echo=FALSE, message=FALSE, include=TRUE}
 
 p1 <- cbp %>% 
@@ -280,6 +296,10 @@ p2 <- cbp %>%
 p2
 
 ```
+
+Seattle OFO numbers parallel SEATAC passenger rates since 2020?
+https://www.theurbanist.org/2023/04/13/airport-passenger-volumes-rebound-at-seatac-expansion-projects-roll-on/
+https://www.seattletimes.com/life/travel/sea-tac-airport-employees-weathered-a-perfect-storm-this-winter/ 
 
 ```{r seattle_portland_total, echo=FALSE, message=FALSE, include=TRUE}
 
