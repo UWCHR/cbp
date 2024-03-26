@@ -367,9 +367,85 @@ https://www.cbp.gov/document/stats/us-border-patrol-monthly-encounters-fy-2000-f
 
 ```{r usbp_monthly}
 
-usbp <- read_delim(here('analyze', 'input', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
+usbp_00_20 <- read_delim(here('analyze', 'input', 'usbp_monthly_encounters_fy2000-fy2020.csv.gz'), delim='|')
 
-usbp <- usbp %>% 
+usbp_20_23 <- cbp %>% 
+  filter(component == "U.S. Border Patrol") %>% 
+  group_by(fiscal_year, calendar_year, month, year_mon, area_of_responsibility) %>% 
+  summarize(value = sum(encounter_count))
+
+usbp_00_20_long <- usbp_00_20 %>% 
+  pivot_longer(cols=-c('month', 'fy', 'cy')) %>% 
+  filter(!name %in% c('monthly_total','coastal_border', 'northern_border', 'southwest_border')) %>% 
+  rename(sector = name) %>% 
+  mutate(fy = as.factor(fy))
+
+usbp_00_20_long$year_mon <- as.yearmon(paste(usbp_00_20_long$cy, usbp_00_20_long$month, sep='-'))
+
+sector_to_aor <- c("big_bend" = "Big Bend Sector",
+  "blaine" = "Blaine Sector",
+  "buffalo" = "Buffalo Sector",
+  "del_rio" = "Del Rio Sector",
+  "detroit" = "Detroit Sector",
+  "el_centro" = "El Centro Sector",
+  "el_paso" = "El Paso Sector",
+  "grand_forks" = "Grand Forks Sector",
+  "havre" = "Havre Sector",
+  "houlton" = "Houlton Sector",
+  "laredo" = "Laredo Sector",
+  "livermore" = "Livermore Sector",
+  "miami" = "Miami Sector",
+  "new_orleans" = "New Orleans Sector",
+  "ramey" = "Ramey Sector",
+  "rio_grande_valley" = "Rio Grande Valley Sector",
+  "san_diego" = "San Diego Sector",
+  "spokane" = "Spokane Sector",
+  "swanton" = "Swanton Sector",
+  "tucson" = "Tucson Sector",
+  "yuma" = "Yuma Sector")
+
+sector_to_aor <- unlist(sector_to_aor)
+
+usbp_20_23$sector <- names(sector_to_aor)[match(usbp_20_23$area_of_responsibility, sector_to_aor)]
+
+usbp_20_23 <- usbp_20_23 %>% 
+  dplyr::select(-area_of_responsibility)
+
+dat <- full_join(usbp_00_20_long, usbp_20_23, by=c("fy" = "fiscal_year",
+                                                   "cy" = "calendar_year",
+                                                   "month" = "month",
+                                                   "year_mon" = "year_mon",
+                                                   "sector" = "sector")) %>% 
+  mutate(diff = value.x - value.y)
+
+stopifnot(sum(dat$diff, na.rm=TRUE) == 0)
+
+dat$value <- coalesce(dat$value.x, dat$value.y)
+
+dat <- dat %>% 
+  select(-diff, -value.x, -value.y)
+
+p0 <- dat %>% 
+  group_by(fy) %>% 
+  summarize(value = sum(value)) %>% 
+  ggplot(aes(x = fy, y=value)) +
+  geom_col()
+
+ggplotly(p0)
+
+p1 <- dat %>% 
+  group_by(sector, fy) %>% 
+  summarize(value = sum(value)) %>% 
+  ggplot(aes(x = fy, y=value, color=sector, group=sector)) +
+  geom_line()
+
+ggplotly(p1)
+
+```
+
+```{r usbp_spw_blw}
+
+usbp_spw_blw <- usbp_00_20 %>% 
   dplyr::select(cy, fy, month, spokane, blaine) %>% 
   rename(usbp_spokane = spokane,
          usbp_blaine = blaine) %>% 
@@ -386,14 +462,14 @@ cbp_spw_blw <- cbp %>%
          cbp_blw = BLW) %>% 
   mutate(fy = as.numeric(as.character(fy)))
 
-dat <- full_join(usbp, cbp_spw_blw, by=c("cy", "fy", "month")) %>%
+dat <- full_join(usbp_spw_blw, cbp_spw_blw, by=c("cy", "fy", "month")) %>%
   mutate(diff_spw = usbp_spokane - cbp_spw,
          diff_blw = usbp_blaine - cbp_blw)
 
 dat$blw <- coalesce(dat$usbp_blaine, dat$cbp_blw)
 dat$spw <- coalesce(dat$usbp_spokane, dat$cbp_spw)
 
-write_delim(dat, here('analyze', 'output', 'usbp_blw_spw_fy2000-fy2023.csv.gz'), delim='|')
+# write_delim(dat, here('analyze', 'output', 'usbp_blw_spw_fy2000-fy2023.csv.gz'), delim='|')
 
 stopifnot(sum(dat$diff_spw, na.rm=TRUE) == 0)
 stopifnot(sum(dat$diff_blw, na.rm=TRUE) == 0)
