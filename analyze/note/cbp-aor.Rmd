@@ -434,26 +434,35 @@ sector_to_aor <- c("big_bend" = "Big Bend Sector",
 
 sector_to_aor <- unlist(sector_to_aor)
 
+sector_to_region <- cbp %>% 
+  filter(component == "U.S. Border Patrol") %>% 
+  dplyr::select(aor, area_of_responsibility, land_border_region) %>% 
+  distinct() %>% 
+  add_row(aor = "LIV", area_of_responsibility = "Livermore Sector", land_border_region = "Other")
+
+sector_to_region$sector <- names(sector_to_aor)[match(sector_to_region$area_of_responsibility, sector_to_aor)]
+
 usbp_20_23$sector <- names(sector_to_aor)[match(usbp_20_23$area_of_responsibility, sector_to_aor)]
 
 usbp_20_23 <- usbp_20_23 %>% 
   dplyr::select(-area_of_responsibility)
 
-dat <- full_join(usbp_00_20_long, usbp_20_23, by=c("fy" = "fiscal_year",
+usbp_00_23 <- full_join(usbp_00_20_long, usbp_20_23, by=c("fy" = "fiscal_year",
                                                    "cy" = "calendar_year",
                                                    "month" = "month",
                                                    "year_mon" = "year_mon",
                                                    "sector" = "sector")) %>% 
+  full_join(sector_to_region, by = "sector") %>% 
   mutate(diff = value.x - value.y)
 
-stopifnot(sum(dat$diff, na.rm=TRUE) == 0)
+stopifnot(sum(usbp_00_23$diff, na.rm=TRUE) == 0)
 
-dat$value <- coalesce(dat$value.x, dat$value.y)
+usbp_00_23$value <- coalesce(usbp_00_23$value.x, usbp_00_23$value.y)
 
-dat <- dat %>% 
+usbp_00_23 <- usbp_00_23 %>% 
   select(-diff, -value.x, -value.y)
 
-p0 <- dat %>% 
+p0 <- usbp_00_23 %>% 
   group_by(fy) %>% 
   summarize(value = sum(value)) %>% 
   ggplot(aes(x = fy, y=value)) +
@@ -461,7 +470,7 @@ p0 <- dat %>%
 
 ggplotly(p0)
 
-p1 <- dat %>%
+p1 <- usbp_00_23 %>%
   group_by(sector, fy) %>% 
   summarize(value = sum(value)) %>% 
   ggplot(aes(x = fy, y=value, color=sector, group=sector)) +
@@ -473,50 +482,60 @@ ggplotly(p1)
 
 ```{r usbp_spw_blw}
 
-usbp_spw_blw <- usbp_00_20 %>% 
-  dplyr::select(cy, fy, month, spokane, blaine) %>% 
-  rename(usbp_spokane = spokane,
-         usbp_blaine = blaine) %>% 
-  mutate(fy = as.numeric(as.character(fy)))
-
-cbp_spw_blw <- cbp %>% 
-  rename(cy = calendar_year,
-         fy = fiscal_year) %>% 
-  filter(aor %in% c("SPW", "BLW")) %>% 
-  group_by(fy, cy, month, aor) %>% 
-  summarize(n = sum(encounter_count)) %>% 
-  pivot_wider(names_from = aor, values_from = n) %>% 
-  rename(cbp_spw = SPW,
-         cbp_blw = BLW) %>% 
-  mutate(fy = as.numeric(as.character(fy)))
-
-dat <- full_join(usbp_spw_blw, cbp_spw_blw, by=c("cy", "fy", "month")) %>%
-  mutate(diff_spw = usbp_spokane - cbp_spw,
-         diff_blw = usbp_blaine - cbp_blw)
-
-dat$blw <- coalesce(dat$usbp_blaine, dat$cbp_blw)
-dat$spw <- coalesce(dat$usbp_spokane, dat$cbp_spw)
-
-# write_delim(dat, here('analyze', 'output', 'usbp_blw_spw_fy2000-fy2023.csv.gz'), delim='|')
-
-stopifnot(sum(dat$diff_spw, na.rm=TRUE) == 0)
-stopifnot(sum(dat$diff_blw, na.rm=TRUE) == 0)
-
-dat_long <- dat %>% 
-  dplyr::select(-starts_with(c('diff', 'cbp'))) %>% 
-  rename('cbp_blw' = 'blw',
-         'cbp_spw' = 'spw') %>% 
-  pivot_longer(cols=-c("cy", "fy", "month")) %>% 
-  mutate(year_mon = as.yearmon(paste(cy, month, sep='-')))
-
-p1 <- dat_long %>% 
-  ggplot(aes(x = year_mon, y = value, color = name)) +
+p1 <- usbp_00_23 %>% 
+  filter(sector %in% c("blaine", "spokane")) %>% 
+  ggplot(aes(x = year_mon, y = value, color = sector)) +
   geom_line() +
   labs(title="USBP Blaine/Spokane Sector encounters FY2000-2023",
        caption="Source: USBP monthly encounters FY2000-2020\nCBP nationwide encounters FY2020-2023",
-       color="Source/Sector")
+       color="USBP Sector")
 
 p1
 
 ```
+
+```{r sector_pct_change}
+
+natl_pct_chg <- usbp_00_23 %>% 
+  group_by(fy) %>% 
+  summarize(value = sum(value)) %>%
+  arrange(fy, .by_group=TRUE) %>% 
+  mutate(pct_change = (value/lag(value) - 1),
+         group = "national")
+
+sector_pct_chg <- usbp_00_23 %>% 
+  group_by(fy, sector) %>% 
+  summarize(value = sum(value)) %>% 
+  group_by(sector) %>% 
+  arrange(fy, .by_group=TRUE) %>% 
+  mutate(pct_change = (value/lag(value) - 1)) %>% 
+  rename(group = sector)
+
+region_pct_chg <- usbp_00_23 %>% 
+  group_by(fy, land_border_region) %>% 
+  summarize(value = sum(value)) %>% 
+  group_by(land_border_region) %>% 
+  arrange(fy, .by_group=TRUE) %>% 
+  mutate(pct_change = (value/lag(value) - 1)) %>% 
+  rename(group = land_border_region)
+
+dat <- rbind(natl_pct_chg, region_pct_chg)
+
+p1 <- dat %>% 
+  ggplot(aes(x = fy, y = pct_change, fill = group, group = group)) +
+  geom_col(position = 'dodge')
+
+p1
+
+dat <- rbind(natl_pct_chg, sector_pct_chg)
+
+p2 <- dat %>% 
+  filter(group %in% c('national', 'blaine', 'spokane')) %>% 
+  ggplot(aes(x = fy, y = pct_change, fill = group, group = group)) +
+  geom_col(position = 'dodge')
+
+p2
+
+```
+
 
