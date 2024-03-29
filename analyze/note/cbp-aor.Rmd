@@ -295,6 +295,20 @@ p2 <- cbp %>%
 
 p2
 
+p3 <- cbp %>% 
+  filter(aor %in% c('BLW', 'SPW')) %>% 
+  group_by(aor, citizenship, fiscal_year) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = fiscal_year, y = n, color = citizenship, group=citizenship)) + 
+  geom_line() +
+  facet_wrap(~aor) +
+  labs(title="USBP Blaine/Spokane Sector encounters",
+       subtitle="Citizenship",
+       caption="Source: CBP nationwide encounters FY2020-2023",
+       color="Sector")
+
+ggplotly(p3)
+
 ```
 
 Seattle OFO numbers parallel SEATAC passenger rates since 2020?
@@ -326,6 +340,20 @@ p2 <- cbp %>%
        color="Field Office")
 
 p2
+
+p3 <- cbp %>% 
+  filter(aor %in% c('Seattle', 'Portland')) %>% 
+  group_by(aor, citizenship, fiscal_year) %>% 
+  summarize(n = sum(encounter_count)) %>% 
+  ggplot(aes(x = fiscal_year, y = n, color = citizenship, group=citizenship)) + 
+  geom_line() +
+  facet_wrap(~aor) +
+  labs(title="OFO Seattle/Portland Field Office encounters",
+       subtitle="Citizenship",
+       caption="Source: CBP nationwide encounters FY2020-2023",
+       color="Field Office")
+
+ggplotly(p3)
 
 ```
 
@@ -433,7 +461,7 @@ p0 <- dat %>%
 
 ggplotly(p0)
 
-p1 <- dat %>% 
+p1 <- dat %>%
   group_by(sector, fy) %>% 
   summarize(value = sum(value)) %>% 
   ggplot(aes(x = fy, y=value, color=sector, group=sector)) +
