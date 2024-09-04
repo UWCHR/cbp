@@ -1,3 +1,3 @@
 # CBP/Border Patrol Stats
 
-`import/input/us_border_patrol_monthly_encounters_fy2000-fy2020-508.pdf` - [Source](https://www.cbp.gov/sites/default/files/assets/documents/2021-Aug/U.S.%20Border%20Patrol%20Monthly%20Encounters%20%28FY%202000%20-%20FY%202020%29%20%28508%29.pdf)
+This repository processes publicly available datasets published by Customs and Border Protection (CBP), drawing from two sources of nationwide aggregate data on [US Border Patrol monthly encounters from FY 2000 to FY 2020](https://www.cbp.gov/document/stats/us-border-patrol-monthly-encounters-fy-2000-fy-2020) and [CBP nationwide encounters from FY 2020 to FY 2023](https://www.cbp.gov/newsroom/stats/nationwide-encounters).
